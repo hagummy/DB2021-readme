@@ -1,0 +1,1505 @@
+import java.sql.*;
+import java.sql.Date;
+import java.util.*;
+
+class Admin {
+	int mode;  //admin 모드에서 어떤 활동을 할 것인지 정하는 변수
+	Scanner scan = new Scanner(System.in);
+	
+	void selectMode(Statement stmt, Connection conn) {
+		while(true)
+		{	
+			System.out.println("\n\t[Admin Mode]");
+			System.out.println("==============================");
+			System.out.println("(0) 돌아가기 (1) 정보 추가 (2) 정보 삭제 \n(3) 내용 갱신 (4) 전체검색 (5) 세부검색");
+			System.out.print("\n실행할 항목을 번호로 선택해주세요 : ");
+
+			mode = scan.nextInt();
+			
+			if(mode == 0) {
+				System.out.println("\n\n*** Admin mode 종료 ***\n");
+				break;// admin 모드 종료 
+			}
+			else if(mode ==1) // 데이터베이스에 삽입하기 위한 메서드 호출
+			{
+				System.out.println("\n\t<< 정보 추가 >>");
+				insert(conn,stmt);
+			}
+			else if(mode ==2) // 데이터베이스의 내용을 삭제하기 위한 메서드 호출
+			{
+				System.out.println("\n\t<< 정보 삭제 >>");
+				delete(conn, stmt);
+			}
+			else if(mode ==3) // 데이터베이스를 업데이트하기 위한 메서드 호출
+			{
+				System.out.println("\n\t<< 내용 갱신 >>");
+				update(conn, stmt);
+			}
+			else if(mode == 4) // 내용을 검색하기 위한 메서드 호출 
+			{
+				System.out.println("\n\t<< 전체검색 >>");
+				search_all(stmt);
+			}
+			else if(mode ==5) 
+			{
+				System.out.println("\n\t<< 세부검색 >>");
+				search(stmt, conn);
+			}
+			System.out.println();
+		}	
+	}
+	void delete(Connection conn, Statement stmt) {//삭제 부분
+		Throwable occuredException = null;
+		System.out.println("(0) 돌아가기 (1) 영화 정보 (2) 배우 정보 (3) 감독 정보 ");
+		System.out.print("어떤 정보를 삭제할 것인지 번호로 선택해주세요 : ");
+        int cho=scan.nextInt();//메뉴 선택 변수
+        
+		PreparedStatement pstmt = null;//변수 초기화
+        ResultSet rs = null;
+        
+        if (cho == 0) {
+        	return;
+        }
+        else if(cho == 1) {//영화 정보 삭제
+        	System.out.println("\n* 영화 정보 삭제 *");
+        	System.out.println("(0) 돌아가기 (1) 시리얼 번호로 삭제 (2) 제목으로 삭제");
+        	System.out.print("삭제를 수행할 번호를 선택해주세요 :  ");
+	        int cho1;
+	        cho1=scan.nextInt();
+	        
+	        if(cho1==0) {
+	        	return;
+	        }
+	        else if(cho1==1) {//시리얼 번호로 삭제 시
+	        	try {
+	        		conn.setAutoCommit(false);//여러 쿼리문이 모두 실행되어야 하므로 transaction으로 묶어준다.
+	        	   	String SerialNum;
+ 	            	System.out.print("영화 시리얼 번호 (ex) M000: ");
+ 	            	SerialNum=scan.next();
+ 	            	String sql2 = "DELETE FROM DB2021_Actor_has WHERE movieNumber=?";
+ 	            	pstmt=conn.prepareStatement(sql2);
+ 		            pstmt.setString(1, SerialNum);
+ 		            pstmt.executeUpdate();
+ 		            
+ 	            	String sql3 = "DELETE FROM DB2021_Genre_has WHERE movieNumber=?";
+ 	            	
+ 	            	pstmt=conn.prepareStatement(sql3);
+ 		            pstmt.setString(1, SerialNum);
+ 		            pstmt.executeUpdate();
+ 		            String sql4 = "DELETE FROM DB2021_MOVIES WHERE movieNumber=?";
+ 		            pstmt=conn.prepareStatement(sql4);
+ 		            pstmt.setString(1, SerialNum);
+ 		            pstmt.executeUpdate();
+ 		            System.out.println("[Success] 시리얼 번호  "+SerialNum+"의 영화 정보가 삭제되었습니다.");
+ 		            conn.commit();//transaction안의 쿼리문 실행
+ 		            conn.setAutoCommit(true); // 다시 오토 모드
+	        	}catch(Exception e)
+				{
+					System.out.println(e+"예외 발생");
+				}
+	        	catch(Throwable e) {//transaction예외 받기
+	                if (conn != null) {
+	                    try {
+	                        conn.rollback();
+	                    } catch(SQLException ex) {}
+	                }
+	                occuredException = e;
+	            }
+
+	        
+            }
+	        else if(cho1==2) {//제목으로 삭제
+	        	try {
+	        		conn.setAutoCommit(false);//transaction
+	        		String title;
+	        		System.out.println("\n※안내※ 영화 제목으로 삭제 시 정확한 제목 확인을 위해 먼저 키워드를 입력받아 키워드와 일치하는 영화 목록이 출력됩니다. \n");
+ 		            System.out.print("제목에 포함되는 키워드 : ");//제목을 입력받아
+ 		            scan.nextLine();
+ 		            title=scan.nextLine();
+ 		            
+ 		            String sql1= "SELECT title FROM DB2021_MOVIES WHERE title LIKE ?";
+ 		            System.out.println("-"+title+"이(가) 포함된 영화의 목록-");//해당 키워드가 포함된 영화를 찾아준 후
+ 		            pstmt=conn.prepareStatement(sql1);
+ 		            pstmt.setString(1, "%"+title+"%");
+ 		            rs= pstmt.executeQuery();
+ 		            while(rs.next()){
+ 	                  String name = rs.getString("title");
+ 	                  System.out.println(name);
+ 	               }
+ 		            
+ 		            System.out.print("\n영화 제목을 정확히 입력해주세요 : ");//더 정확히 입력하여 삭제 할 수 있도록 한다.
+ 		            
+ 		            title=scan.nextLine();
+ 		            
+ 		            String sql2 = "DELETE FROM DB2021_Actor_has WHERE movieNumber=(SELECT movienumber FROM DB2021_MOVIES WHERE title LIKE ?)";
+ 		            pstmt=conn.prepareStatement(sql2);//영화와 연결된 배우들의 출연이력을 지우기 위한 쿼리문
+ 		            pstmt.setString(1, "%"+title+"%");
+ 		            pstmt.executeUpdate();
+ 		            
+ 		            String sql3 = "DELETE FROM DB2021_Genre_has WHERE movieNumber=(SELECT movienumber FROM DB2021_MOVIES WHERE title LIKE ?)";
+ 		            pstmt=conn.prepareStatement(sql3);//영화와 연결된 장르들의 이력들을 지우기 위한 쿼리문
+ 		            pstmt.setString(1, "%"+title+"%");
+ 		            pstmt.executeUpdate();
+ 		            String sql4 = "DELETE FROM DB2021_Movies WHERE title LIKE ?";//위에 관련된 테이블에서의 정보를 먼저 삭제 한후 영화의 정보를 삭제해준다.
+ 		            pstmt=conn.prepareStatement(sql4);
+ 		            pstmt.setString(1, "%"+title+"%");
+ 		            pstmt.executeUpdate();
+ 		            System.out.println("[Success] 영화  "+title +"의 정보가 삭제되었습니다.");//영화 리스트 보여주기
+ 		            conn.commit();//transaction문 끝
+ 		            conn.setAutoCommit(true); // 다시 오토커밋
+	        	}catch(Exception e)
+				{
+					System.out.println(e+"예외 발생");
+				}
+	        	catch(Throwable e) {
+	                if (conn != null) {
+	                    try {
+	                        conn.rollback();
+	                    } catch(SQLException ex) {}
+	                }
+	                occuredException = e;
+	            } 
+	        }
+	        else {
+           	 System.out.println("[Fail] 잘못된 입력입니다.");
+           	 return;
+	        }
+	        
+        }
+        else if(cho ==2) {//배우 정보 삭제
+        	System.out.println("\n* 배우 정보 삭제 *");
+        	System.out.println("(0) 돌아가기 (1) 시리얼 번호로 삭제 (2) 배우의 이름으로 삭제");
+        	System.out.print("삭제를 수행할 번호를 선택해주세요 :  ");
+	        int cho1;
+	            
+	        cho1=scan.nextInt();
+	        
+	        if(cho1==0) {
+	        	return;
+	        }
+	        else if(cho1==1) {//시리얼 번호로 삭제
+	        	try {
+	        		conn.setAutoCommit(false);//쿼리문이 모두 수행되어야 하므로 트랜잭션
+	        		String SerialNum;
+ 	            	System.out.print("배우 시리얼 번호 : ");
+ 	            	SerialNum=scan.next();
+ 	            	String sql2 = "DELETE FROM DB2021_Actor_has WHERE actorNumber=?";//has table에서 정보 먼저 삭제
+ 	            	pstmt=conn.prepareStatement(sql2);
+ 		            pstmt.setString(1, SerialNum);
+ 	            	
+ 	            	pstmt.executeUpdate();
+ 	            	String sql3="DELETE FROM DB2021_Actors WHERE actorNumber=?";//배우 정보 삭제
+ 	            	pstmt=conn.prepareStatement(sql3);
+ 		            pstmt.setString(1, SerialNum);
+ 		            pstmt.executeUpdate();
+ 	            	
+ 		            System.out.println("[Success] 시리얼 번호  "+SerialNum+"의 배우 정보가 삭제되었습니다.");
+ 		            conn.commit();
+ 		            conn.setAutoCommit(true); // 다시 오토커밋
+	        	}catch(Exception e)
+				{
+					System.out.println(e+"예외 발생");
+				}catch(Throwable e) {
+	                if (conn != null) {
+	                    try {
+	                        conn.rollback();
+	                    } catch(SQLException ex) {}
+	                }
+	                occuredException = e;
+	            } 
+	        	 
+	        	
+	        }
+	        else if(cho1==2) {//이름으로 삭제
+	        	try {
+	        		conn.setAutoCommit(false);
+	        	 	String name;
+ 		            System.out.print("배우 이름 : ");
+ 		            scan.nextLine();
+ 		            name=scan.nextLine();
+ 		            
+ 		            String sql1= "DELETE FROM DB2021_Actor_has WHERE actorNumber=(SELECT actorNumber FROM DB2021_Actors WHERE name= ?)";
+ 		            pstmt=conn.prepareStatement(sql1);//배우 이름으로 시리얼 번호를 찾아 has table에서 정보 삭제
+ 		            pstmt.setString(1, name);
+ 		            pstmt.executeUpdate();
+ 		            
+ 		            
+ 		            String sql4= "DELETE FROM DB2021_Actors WHERE name=?";//그 다음 배우 정보 삭제
+ 		            pstmt=conn.prepareStatement(sql4);
+ 		            pstmt.setString(1, name);
+ 		            pstmt.executeUpdate();
+ 		            System.out.println("[Success] 배우  "+name +"의 정보가 삭제되었습니다.");
+ 		            conn.commit();
+ 		            conn.setAutoCommit(true); // 다시 오토커밋
+	        	}catch(Exception e)
+				{
+					System.out.println(e+"예외 발생");
+				}
+	        	catch(Throwable e) {
+	                if (conn != null) {
+	                    try {
+	                        conn.rollback();
+	                    } catch(SQLException ex) {}
+	                }
+	                occuredException = e;
+	            }
+	        }
+	        else {
+	           	 System.out.println("[Fail] 잘못된 입력입니다.");
+	           	 return;
+	        }
+        }
+        else if(cho == 3) {//감독 정보 삭제
+        	System.out.println("\n* 감독 정보 삭제 *");
+        	System.out.println("(0) 돌아가기 (1) 감독의 이름으로 삭제");
+        	System.out.print("삭제를 수행할 번호를 선택해주세요 :  ");
+
+	        int cho1;
+	            
+	        cho1=scan.nextInt();
+        	
+	        if(cho1==0) {
+	        	return;
+	        }
+	        else if(cho1==1) {//감독은 시리얼 번호가 없으므로 이름으로만 정보 삭제
+	        	try {
+	        		conn.setAutoCommit(false);//여러 쿼리문이 수행되므로 트랜잭션
+	        		String name;
+ 		            System.out.print("감독 이름 : ");
+ 		            scan.nextLine();
+ 		            name=scan.nextLine();
+ 		            
+ 		            String sql= "update DB2021_Movies set director='-' WHERE director=?";//감독이 맡은 영화의 감독란은 공란으로 대체한다.
+ 		            pstmt=conn.prepareStatement(sql);
+ 		            pstmt.setString(1, name);
+ 		            pstmt.executeUpdate();
+ 		            
+ 		            String sql2 = "DELETE FROM DB2021_Directors WHERE name=?";//감독 정보 삭제
+ 		             pstmt=conn.prepareStatement(sql2);
+ 		             pstmt.setString(1, name);
+ 		            pstmt.executeUpdate();
+ 		            
+ 		            System.out.println("[Success] 감독  "+name +"의 정보가 삭제되었습니다.");
+ 		            conn.commit();
+ 		            conn.setAutoCommit(true); // 다시 오토커밋
+	        	}catch(Exception e)
+				{
+					System.out.println(e+"예외 발생");
+				}
+	        	catch(Throwable e) {
+	                if (conn != null) {
+	                    try {
+	                        conn.rollback();
+	                    } catch(SQLException ex) {}
+	                }
+	                occuredException = e;
+	            } 
+	        }
+	        else {
+	        	System.out.println("[Fail] 잘못된 입력입니다.");
+	           	 return;
+	        }
+        }
+        else {
+        	System.out.println("잘못된 입력입니다.");
+        }
+        
+	}
+	void insert(Connection conn, Statement stmt){
+		int i_mode;  //어떤 테이블에 정보를 삽입할 것인지 선택
+		System.out.println("(0) 돌아가기 (1) 배우 (2) 감독 (3) 국가 (4) 영화");
+		System.out.print("어떤 정보를 추가할 것인지 번호로 선택해주세요 : ");
+		i_mode = scan.nextInt();
+		PreparedStatement pstmt = null;
+		String sql = null;
+        ResultSet rs = null;
+        Throwable occuredException = null;
+		if(i_mode ==0) // selectMode로 돌아가기 
+			return;
+		else if(i_mode==1) // 배우 정보 삽입 선택 시 
+		{
+			try {			
+				sql = "insert into db2021_actors values(?,?,?,?,?)"; 
+				pstmt = conn.prepareStatement(sql);
+				
+				//actorNumber, 이름, 성별, 국적, 생년월일을 차례로 입력받아 setString으로 설정	
+				System.out.println("\n* 배우 정보 입력 시작 *");
+				System.out.print("ActorNumber (ex) A000 :");
+				String anum = scan.next();
+				pstmt.setString(1,anum);
+				
+				scan.nextLine(); //엔터 제거용 
+				System.out.print("배우의 이름 :");
+				String name = scan.nextLine();
+				pstmt.setString(2,name);
+				
+				System.out.print("성별(M/F) :");
+				String gender = scan.next(); 
+				pstmt.setString(3,gender);
+				
+				scan.nextLine();//엔터 제거용 
+				System.out.print("배우의 국적 :");
+				String nationality = scan.nextLine(); 
+				pstmt.setString(4,nationality);
+
+				System.out.print("생년월일 (ex)YYYY-MM-DD :");
+				String birthday = scan.next(); 
+				pstmt.setString(5,birthday);
+				
+				// 입력이 완료되면 sql문 실행
+				pstmt.executeUpdate();
+				System.out.println("\n[Success] 배우 정보 추가 완료!");
+			}
+			catch(Exception e) {
+				System.out.println(e+" 예외 발생");
+			}
+			
+		}
+		else if(i_mode ==2)// 감독 정보 삽입 선택 시 
+		{
+			try {		
+				System.out.println("\n* 감독 정보 입력 시작 *");
+				sql = "insert into db2021_directors values(?,?,?,?,?)";
+				pstmt = conn.prepareStatement(sql);
+				
+				// 이름, 성별, 국적, 생년월일, 필모그래피를 차례로 입력받아 setString으로 설정
+				scan.nextLine();//엔터 제거용 
+				
+				System.out.print("감독의 이름 :");
+				String name = scan.nextLine();
+				pstmt.setString(1,name);
+				
+				System.out.print("성별(M/F) :");
+				String gender = scan.next(); 
+				pstmt.setString(2,gender);
+
+				scan.nextLine();//엔터 제거용 
+				System.out.print("국적 :");
+				String nationality = scan.nextLine(); 
+				pstmt.setString(3,nationality);
+
+				System.out.print("생년월일 (ex)YYYY-MM-DD :");
+				String birthday = scan.next(); 
+				pstmt.setString(4,birthday);
+
+				System.out.print("필모그래피 (개수 입력) :");
+				int f = scan.nextInt(); 
+				pstmt.setInt(5,f);
+				
+				// 입력이 완료되면 sql문 실행
+				pstmt.executeUpdate();
+				System.out.println("\n[Success] 감독 정보 추가 완료!");
+			}
+			catch(Exception e) {
+				System.out.println(e+" 예외 발생");
+			}
+		}
+		else if(i_mode==3) // 국가 정보 입력 선택 시 
+		{
+			try {			
+				System.out.println("\n* 국가 정보 입력 시작 *");
+				sql = "insert into db2021_country values(?,?)";
+				pstmt = conn.prepareStatement(sql);
+				
+				// 이름, 성별, 국적, 생년월일, 필모그래피를 차례로 입력받아 setString으로 설정
+				System.out.print("국가명 :");
+				scan.nextLine();//엔터 제거용 
+				String country = scan.nextLine();
+				pstmt.setString(1,country);
+
+				System.out.print("continent :");
+				String location = scan.nextLine(); 
+				pstmt.setString(2,location);
+				
+				// 입력이 완료되면 sql문 실행
+				pstmt.executeUpdate();
+				System.out.println("\n[Success] 국가 정보 추가 완료!");
+			}
+			catch(Exception e) {
+				System.out.println(e+" 예외 발생");
+			}
+			return;
+		}
+		else if(i_mode==4)//영화 정보 입력 선택 시
+		{
+			try {
+				conn.setAutoCommit(false);//여러 입력을 받으므로 트랜잭션 사용
+				System.out.println("\n* 영화 정보 입력 시작 *");
+	            System.out.println("영화 시리얼 번호 (ex) M000 :");
+	            String movieNumber;
+	            movieNumber=scan.next();
+	            scan.nextLine();
+	            System.out.print("영화 제목 : ");
+	            String title;
+	            
+	            title=scan.nextLine();
+	            System.out.print("감독 : ");
+	            sql = "update db2021_directors set filmography=filmography+1 WHERE name=?";//감독의 맡는 작품이 하나 들어나므로 필모그래피 정보에서 숫자를 하나 늘려준다.
+	            String director;
+	            director=scan.nextLine();
+	            pstmt = conn.prepareStatement(sql);
+				pstmt.setString(1,director);
+				pstmt.executeUpdate();
+	            System.out.print("평점 (ex) 10.0 : ");
+	            float score;
+	            score=scan.nextFloat();
+	            System.out.print("국가 : ");
+	            String country;
+	            country=scan.next();
+	            System.out.print("러닝 타임 (분) : ");
+	            int runningTime;
+	            runningTime=scan.nextInt();
+	            System.out.print("개봉 날짜 (ex)YYYY-MM-DD : ");
+	            String releaseDate;
+	            releaseDate=scan.next();
+	            System.out.print("관객 수 (명) : ");
+	            int attendance;
+	            attendance=scan.nextInt();
+	            
+	            String sql2="INSERT INTO DB2021_Movies (movieNumber, title, director, releaseDate, country, runningTime, score, attendance) VALUES (?,?,?,?,?,?,?,?)";
+	            pstmt=conn.prepareStatement(sql2);
+		        pstmt.setString(1, movieNumber);
+		        pstmt.setString(2, title);
+		        pstmt.setString(3, director);
+		        pstmt.setString(4, releaseDate);
+		        pstmt.setString(5, country);
+		        pstmt.setInt(6, runningTime);
+		        pstmt.setFloat(7, score);
+		        pstmt.setInt(8, attendance);
+		        pstmt.executeUpdate();
+		        scan.nextLine();
+	            System.out.println("* 해당 영화에 출연하는 배우 정보 입력 *");
+	            System.out.println("※안내※ 0 입력 시 입력 종료");
+	            
+	            while(true) {//여러 배우 정보 입력을 받기 위해 while문
+	            	System.out.print("배우의 이름 :  ");
+	            	String name;
+	            	
+	            	name=scan.nextLine();
+	            	
+	            	if(name.equals("0"))//0이 입력되면 배우 정보 입력 끝
+	            		break;
+	            	else {
+	            	String sql1= "SELECT actorNumber FROM DB2021_Actors WHERE name=?";//배우 이름으로 시리얼 번호 추출
+	            	
+	            	pstmt=conn.prepareStatement(sql1);
+ 		            pstmt.setString(1, name);
+ 		            rs= pstmt.executeQuery();
+	            	
+	            	while(rs.next()){
+	        	              
+	        	            String actorNumber = rs.getString(1);
+	        	            String sql4="INSERT INTO DB2021_Actor_has (actorNumber, movieNumber) VALUES (?,?)";//영화 시리얼 번호와 배우의 시리얼 번호를 함께 삽입
+	        	            pstmt=conn.prepareStatement(sql4);
+	     		            pstmt.setString(1, actorNumber);
+	     		            pstmt.setString(2, movieNumber);
+	     		            pstmt.executeUpdate();
+	     		            System.out.println("배우"+name+"가(이) 영화 출연자 정보에 추가되었습니다.");
+	        	           
+	        	            }
+	            	}
+	            }
+	            
+	          
+	            System.out.println("* 해당 영화의 장르 입력 *");
+	            System.out.println("※안내※ 0 입력 시 입력 종료");
+	            
+	            while(true) {//위의 배우 입력과 같은 경우
+	            	System.out.print("장르 :  ");
+	            	String genre;
+	            	genre=scan.next();
+	            	
+	            	if(genre.equals("0"))
+	            		break;
+	            	else {
+	            	String sql1= "SELECT genreNumber FROM DB2021_Genres WHERE genre=?";
+	            	pstmt=conn.prepareStatement(sql1);
+ 		            pstmt.setString(1, genre);
+ 		            rs= pstmt.executeQuery();
+	            	
+	            	
+	            	
+	            	while(rs.next()){
+	        	              
+	        	            String genreNumber = rs.getString(1);
+	        	            String sql3="INSERT INTO DB2021_genre_has (genreNumber, movieNumber) VALUES (?,?)";
+	        	            pstmt=conn.prepareStatement(sql3);
+	     		            pstmt.setString(1, genreNumber);
+	     		            pstmt.setString(2, movieNumber);
+	     		            pstmt.executeUpdate();
+	     		            System.out.println(genre+" 장르가 추가되었습니다.");
+	        	           
+	        	            }
+	            	}
+	            }
+	            
+	            
+				System.out.println("\n[Success] 영화 정보 추가 완료!");
+	            conn.commit();//트랜잭션 완료
+	            conn.setAutoCommit(true); // 다시 오토커밋
+			}catch(Exception e) {
+				 System.out.println("잘못된 입력입니다.");
+			}
+			catch(Throwable e) {
+		        if (conn != null) {
+		            try {
+		            	 System.out.println("[Fail] 정보가 모두 입력되지 못했습니다.");
+		                conn.rollback();
+		            } catch(SQLException ex) {}
+		        }
+		        occuredException = e;
+		    } 
+
+		
+		}
+		else {
+			System.out.println("잘못 입력");
+			return;
+		}
+	}
+	void update(Connection conn, Statement stmt) {
+		int u_mode; // 어떤 테이블의 정보를 업데이트할 것인지 선택
+		System.out.println("(0) 돌아가기 (1) 영화 평점 (2) 영화 관객 수 (3) 감독 작품 수 (4) 영화 출연 배우 추가");
+		System.out.print("어떤 정보를 갱신할 것인지 번호로 선택해주세요 : ");
+		u_mode = scan.nextInt();
+		
+		PreparedStatement pstmt = null;
+		String sql = null;
+
+		if(u_mode ==0) // selectMode로 돌아가기
+			return;
+		else if(u_mode==1) // 영화 평점 업데이트 시 
+		{
+			try {
+				System.out.println("\n* 영화 평점 갱신 시작 *");
+				sql = "update db2021_movies set score=? where movieNumber=?";
+				pstmt = conn.prepareStatement(sql);
+				
+				// 어떤 영화의 평점을 갱신할 것인지 movieNumber로 입력받은 후 변경 평점을 입력
+				System.out.println("평점을 갱신할 영화의 시리얼 번호 입력 (ex) M000 : ");
+				String movie = scan.next();
+				pstmt.setString(2,movie);
+				
+				System.out.print("변경할 평점 입력 (ex) 10.0 :");
+				float s = scan.nextFloat();
+				pstmt.setFloat(1,s);
+				
+				// 입력이 끝난 후 해당 number의 영화 평점 업데이트
+				pstmt.executeUpdate();
+				System.out.println("[Success] "+movie+"번 영화의 평점이"+s+"점으로 변경되었습니다.");
+			}
+			catch(Exception e) {
+
+			}
+			
+		}
+		else if(u_mode ==2) //영화 관객 수 업데이트 시 
+		{
+			try {
+				System.out.println("\n* 영화 관객 수 갱신 시작*");
+				sql = "update db2021_movies set attendance=? where movieNumber=?";
+				pstmt = conn.prepareStatement(sql);
+				
+				// 어떤 영화의 관객수를 갱신할 것인지 movieNumber로 입력받은 후 변경 관객수를 입력
+				System.out.print("관객수를 갱신할 영화의 시리얼 번호 입력 (ex) M000 : ");
+				String movie = scan.next();
+				pstmt.setString(2,movie);
+				
+				System.out.print("변경 관객수 (명):");
+				int n = scan.nextInt();
+				pstmt.setInt(1,n);
+				
+				// 입력이 끝난 후 해당 number의 영화 관객수 업데이트
+				pstmt.executeUpdate();
+				System.out.println("[Success] "+movie+"번 영화의 관객수가 "+n+"명으로 변경되었습니다.");
+			}
+			catch(Exception e) {
+				
+			}
+		}
+		else if(u_mode==3) // 감독 작품 수 변경 시
+		{
+			try {
+				System.out.println("\n* 감독 작품 수 갱신 시작 *");
+
+				sql = "update db2021_directors set filmography=? where name=?";
+				pstmt = conn.prepareStatement(sql);
+				
+				// 어떤 감독의 작품 수를 갱신할 것인지 감독의 이름으로 입력받은 후 변경할 개수를 입력
+				
+				System.out.print("필모그래피를 갱신할 감독의 이름 입력 : ");
+				scan.nextLine();//엔터 제거용 
+				String name = scan.nextLine();
+				pstmt.setString(2,name);
+				
+				System.out.print("필모그래피 변경 개수: ");
+				int n = scan.nextInt();
+				pstmt.setInt(1,n);
+				
+				//입력이 끝난 후 해당 감독의 작품 수 업데이트 
+				pstmt.executeUpdate();
+				System.out.println("[Success] "+name+" 감독의 필모그래피가 "+n+"개로 변경되었습니다.");
+			}
+			catch(Exception e) {
+				
+			}
+		}
+		else if(u_mode==4) 
+		{
+			try {			
+				System.out.println("\n* 영화에 출연하는 배우 추가 *");
+
+				sql = "insert into db2021_actor_has values(?,?)"; 
+				pstmt = conn.prepareStatement(sql);
+				
+				System.out.print("배우를 추가할 영화의 시리얼 번호 (ex) M000 : ");
+				String mnum = scan.next();
+				pstmt.setString(2,mnum);
+				
+				System.out.print("추가 배우의 시리얼 번호  (ex) A000 :");
+				String anum = scan.next();
+				pstmt.setString(1,anum);
+				
+				scan.nextLine(); //엔터 제거용 
+				
+				
+				pstmt.executeUpdate();
+				System.out.println("[Success]"+mnum+"영화의 배우 정보가 추가되었습니다.");
+			}
+			catch(Exception e) {
+				System.out.println(e+" 예외 발생");
+			}
+		}
+		else {
+			System.out.println("[Fail] 잘못 입력");
+			return;
+		}
+	}
+
+	void search_all(Statement stmt) { //선택한 테이블의 모든 튜플을 출력
+		int s_mode; 
+		System.out.println("(0) 돌아가기 (1) movie 정보 (2) 배우 정보 (3) 감독 정보 (4) 국가 정보 (5) 장르 정보");
+		System.out.print("어떤 정보를 검색할 것인지 번호로 선택해주세요 : ");
+
+		s_mode = scan.nextInt();
+		
+		String table, sql;
+		int count = 0; //전체 몇 개의 튜플이 있는지 저장하기 위한 변수
+		
+		if(s_mode ==0)
+			return;
+		else if(s_mode == 1) { //movie 정보 선택 시
+			System.out.println("\n* 모든 영화 정보 *");
+			table = "db2021_movies";
+			sql = "SELECT * from "+table;
+			
+			try
+			{
+				ResultSet rs = stmt.executeQuery(sql);
+				while(rs.next()){
+					count++;  
+					// 각 데이터를 테이블에서 얻어 변수에 저장 및 출력
+					String title = rs.getString("title");
+					String mnum = rs.getString("movieNumber");
+					String director = rs.getString("director");
+					Date rdate = rs.getDate("releaseDate");
+					String country = rs. getString("country");
+					int rtime = rs.getInt("runningTime");
+					float score = rs.getFloat("score");
+					int att = rs.getInt("attendance");
+					
+					System.out.println("["+mnum+"] 제목:"+title);
+					System.out.println("감독:"+director+" 개봉일:"+rdate+" 국가:"+country
+							+ " 러닝타임:"+rtime+"(분) 평점:"+score+" 관객수:"+att+"명");
+					System.out.println();
+				}
+				System.out.println("총 "+count+"개의 영화 정보가 있습니다.");
+				rs.close();
+			}
+			catch(Exception e)
+			{
+				System.out.println(e+"예외 발생");
+			}
+		}
+		else if(s_mode == 2) { // 배우 정보 선택 시 
+			table = "db2021_actors";
+			sql = "SELECT * from "+table;
+			System.out.println("\n* 모든 배우 정보 *");
+
+			try
+			{
+				ResultSet rs = stmt.executeQuery(sql);
+				while(rs.next()){
+					count++;
+					// 각 데이터를 테이블에서 얻어 변수에 저장 및 출력
+					String anum = rs.getString("actorNumber");
+					String name = rs.getString("name");
+					String gender = rs.getString("gender");
+					String nationality = rs.getString("nationality");
+					Date birthday = rs. getDate("birthday");
+
+					System.out.println("["+anum+"] 이름:"+name);
+					System.out.println("성별:"+ gender +" 국적:"+nationality+" 생일:"+birthday);
+					System.out.println();
+				}
+				System.out.println("총 "+count+"명의 배우 정보가 있습니다.");
+				rs.close();
+			}
+			catch(Exception e)
+			{
+				System.out.println(e+"예외 발생");
+			}
+		}
+		
+		else if(s_mode ==3) { // 감독 정보 선택 시
+			table = "db2021_directors";
+			sql = "SELECT * from "+table;
+			System.out.println("\n* 모든 감독 정보 *");
+
+			try
+			{
+				ResultSet rs = stmt.executeQuery(sql);
+				
+				while(rs.next()){
+					
+					// 각 데이터를 테이블에서 얻어 변수에 저장 및 출력
+					String name = rs.getString("name");
+					String gender = rs.getString("gender");
+					String nationality = rs.getString("nationality");
+					Date birthday = rs. getDate("birthday");
+					int filmography = rs.getInt("filmography");
+					if(!name.equals("-")) {//감독정보 검색 시 감독의 이름이 '-'인 경우는 제외하여 출력한다.
+					count++;
+					System.out.println("['"+name+"' 감독 정보]");
+					System.out.println("성별:"+ gender +" 국적:"+nationality+" 생일:"+
+							birthday+" 필모그래피:"+filmography+"(개)");
+					System.out.println();
+					}
+				}
+				System.out.println("총 "+count+"명의 감독 정보가 있습니다.");
+
+				rs.close();
+			}
+			catch(Exception e)
+			{
+				System.out.println(e+"예외 발생");
+			}
+		}
+		else if(s_mode == 4){ //국가 정보 선택 시 
+			table = "db2021_country";
+			sql = "SELECT * from "+table;
+			System.out.println("\n* 모든 국가 정보 *");
+
+			try
+			{
+				ResultSet rs = stmt.executeQuery(sql);
+				
+				while(rs.next()){
+					count++;
+					// 각 데이터를 테이블에서 얻어 변수에 저장 및 출력
+					String country = rs.getString("country");
+					String location = rs.getString("location");
+					System.out.println("국가명 : "+country+" - 위치: "+location);
+				}
+				System.out.println("\n총 "+count+"개의 국가 정보가 있습니다.");
+				rs.close();
+			}
+			catch(Exception e)
+			{
+				System.out.println(e+"예외 발생");
+			}
+		}
+		else if(s_mode == 5) { // 장르 정보 선택 시 
+			table = "db2021_genres";
+			sql = "SELECT * from "+table;
+			System.out.println("\n* 모든 장르 정보 *");
+			try
+			{
+				ResultSet rs = stmt.executeQuery(sql);
+				
+				while(rs.next()){
+					count++;
+					// 각 데이터를 테이블에서 얻어 변수에 저장 및 출력
+					String gnum = rs.getString("genreNumber");
+					String genre = rs.getString("genre");
+					System.out.println("["+gnum+"] "+genre);
+				}
+				System.out.println("\n총 "+count+"개의 장르 정보가 있습니다.");
+				rs.close();
+			}
+			catch(Exception e)
+			{
+				System.out.println(e+"예외 발생");
+			}
+		}
+		else {
+			System.out.println("잘못 입력");
+			return;
+		}		
+	}
+	
+	void search(Statement stmt, Connection conn) // 선택한 테이블에서 입력한 조건에 따라 매칭되는 튜플만 출력
+	{
+		int s_mode;
+		System.out.println("(0) 돌아가기 (1) movie 세부 정보 (2) 배우 세부 정보 (3) 감독 세부 정보 (4) 장르 세부 정보");
+		System.out.print("세부 검색할 항목을 번호로 선택해주세요 : ");
+		s_mode = scan.nextInt();
+		
+		String table, sql;
+		PreparedStatement pstmt = null;
+
+		if (s_mode ==0)
+			return;
+		else if(s_mode==1) // 영화 세부정보를 선택한 경우 
+		{
+        	System.out.println("\n* 영화 세부 정보 검색 *");
+			System.out.println("(1) 제목으로 검색 (2) movieNumber로 검색"); // 제목이나 시리얼번호로 검색 가능 
+			System.out.print("검색할 방법을 번호로 선택해주세요 : ");
+			int n = scan.nextInt();
+			if(n==1) // 영화 제목으로 세부 검색 
+			{
+				try{
+					// 입력받은 문자열이 포함된 모든 영화 정보 출력하도록 like문 사용 
+					System.out.println("\n※안내※ 제목으로 검색 시 입력한 키워드가 포함된 모든 항목이 출력됩니다.\n");
+					sql = "select * from db2021_movies use index(Midx) where title like ?";
+					pstmt = conn.prepareStatement(sql);
+
+					System.out.print("영화 제목 입력 :"); 
+					scan.nextLine();//엔터 제거용 
+					String stitle = scan.nextLine();
+					
+					pstmt.setString(1,"%"+ stitle+"%");
+					
+					System.out.println("\n-'"+stitle+"'이(가) 포함된 영화 목록-");
+					ResultSet rs = pstmt.executeQuery();
+
+					while(rs.next()){
+						String title = rs.getString("title");
+						String mnum = rs.getString("movieNumber");
+						String director = rs.getString("director");
+						Date rdate = rs.getDate("releaseDate");
+						String country = rs. getString("country");
+						int rtime = rs.getInt("runningTime");
+						float score = rs.getFloat("score");
+						int att = rs.getInt("attendance");
+						
+						System.out.println("["+mnum+"] 제목:"+title);
+						System.out.println("감독:"+director+" 개봉일:"+rdate+" 국가:"+country
+								+ " 러닝타임:"+rtime+"(분) 평점:"+score+" 관객수:"+att+"명");
+						System.out.println();
+					}
+					rs.close();
+					return;
+				}
+				catch(Exception e)
+				{
+					System.out.println(e+"예외 발생");
+				}
+			}
+			else if(n==2) //영화 number로 세부검색
+			{
+				try
+				{
+					// 영화의 시리얼 번호와 정확히 일치하는 튜플을 출력 
+					sql = "select * from db2021_movies where movieNumber=?";
+					pstmt = conn.prepareStatement(sql);
+					
+					System.out.print("영화 번호(ex M000) :"); 
+					String snum = scan.next();
+				
+					pstmt.setString(1, snum);
+
+				
+					System.out.println("\n["+snum+"] 영화 정보");
+					ResultSet rs = pstmt.executeQuery();
+					while(rs.next()){
+						String title = rs.getString("title");
+						String mnum = rs.getString("movieNumber");
+						String director = rs.getString("director");
+						Date rdate = rs.getDate("releaseDate");
+						String country = rs. getString("country");
+						int rtime = rs.getInt("runningTime");
+						float score = rs.getFloat("score");
+						int att = rs.getInt("attendance");
+						
+						System.out.println("제목:"+title);
+						System.out.println("감독:"+director+" 개봉일:"+rdate+" 국가:"+country
+								+ " 러닝타임:"+rtime+"(분) 평점:"+score+" 관객수:"+att+"명");
+						System.out.println();
+					}
+					rs.close();
+					return;
+				}
+				catch(Exception e)
+				{
+					System.out.println(e+"예외 발생");
+				}
+			}
+			else
+			{
+				System.out.println("잘못 입력");
+				return;
+			}
+		}
+		else if(s_mode==2) // 배우 세부 정보를 선택한 경우
+		{
+        	System.out.println("\n* 배우 세부 정보 검색 *");
+			System.out.println("(1) 이름으로 검색 (2) actorNumber로 검색 (3) 국가별 배우 검색");  // 배우의 이름이나 시리얼번호로 검색 가능 
+			System.out.print("검색할 방법을 번호로 선택해주세요 : ");
+			int n = scan.nextInt();
+			if(n==1) //배우 이름으로 검색
+			{
+				try
+				{
+					System.out.println("\n※안내※ 이름으로 검색 시 입력한 단어가 이름에 포함된 모든 배우 목록이 출력됩니다.\n");
+
+					// 입력한 문자열이 이름에 포함되어 있는 모든 배우 정보 출력  
+					sql = "select * from db2021_actors where name like ?";
+					pstmt = conn.prepareStatement(sql);
+					
+					System.out.print("배우 이름 :"); 
+					scan.nextLine();//엔터 제거용 
+					String sname = scan.nextLine();
+					
+					pstmt.setString(1,"%"+ sname+"%");
+					
+					System.out.println("'"+sname+"'와(과) 관련된 배우 정보 목록");
+					ResultSet rs = pstmt.executeQuery();
+										
+					while(rs.next()){
+						String anum = rs.getString("actorNumber");
+						String name = rs.getString("name");
+						String gender = rs.getString("gender");
+						String nationality = rs.getString("nationality");
+						Date birthday = rs. getDate("birthday");
+
+						System.out.println("["+anum+"] 이름:"+name);
+						System.out.println("성별:"+ gender +" 국적:"+nationality+" 생일:"+birthday);
+						System.out.println();
+					}
+					rs.close();
+					return;
+				}
+				catch(Exception e)
+				{
+					System.out.println(e+"예외 발생");
+				}
+			}
+			else if(n==2) //배우 number로 검색
+			{
+				try
+				{
+					
+					// 입력한 배우의 시리얼 번호와 일치하는 배우의 정보 출력 
+					sql = "select * from db2021_actors where actorNumber=?";
+					pstmt = conn.prepareStatement(sql);
+
+					System.out.print("\n배우 번호(ex) A000 :"); 
+					String snum = scan.next();
+					
+					pstmt.setString(1, snum);
+					System.out.println("["+snum+"] 배우 정보");
+					ResultSet rs = pstmt.executeQuery();
+					while(rs.next()){
+						String anum = rs.getString("actorNumber");
+						String name = rs.getString("name");
+						String gender = rs.getString("gender");
+						String nationality = rs.getString("nationality");
+						Date birthday = rs. getDate("birthday");
+
+						System.out.println("["+anum+"] 이름:"+name);
+						System.out.println("성별:"+ gender +" 국적:"+nationality+" 생일:"+birthday);
+						System.out.println();
+					}
+					rs.close();
+					return;
+				}
+				catch(Exception e)
+				{
+					System.out.println(e+"예외 발생");
+				}
+			}
+			if(n==3) //배우 국적으로 검색
+			{
+				try
+				{
+					System.out.println("\n※안내※ 입력한 국가를 국적으로 하는 배우가 모두 출력됩니다.\n");
+					// 입력한 문자열이 국적인 배우의 정보를 출력한다. 
+					sql = "select * from db2021_actors use index(Aidx) where nationality = ?";
+					pstmt = conn.prepareStatement(sql);
+					
+					System.out.print("국가 :"); 
+					scan.nextLine();//엔터 제거용 
+					String country = scan.nextLine();
+					
+					pstmt.setString(1, country);
+					
+					System.out.println("국적이 '"+country+"'인 배우 목록 ");
+					ResultSet rs = pstmt.executeQuery();
+					
+					while(rs.next()){
+						String anum = rs.getString("actorNumber");
+						String name = rs.getString("name");
+						String gender = rs.getString("gender");
+						Date birthday = rs. getDate("birthday");
+
+						System.out.println("[Number : "+anum+"]");
+						System.out.println("이름:"+name+" 성별:"+ gender +" 생일:"+birthday);
+						System.out.println();
+					}
+					rs.close();
+					return;
+				}
+				catch(Exception e)
+				{
+					System.out.println(e+"예외 발생");
+				}
+			}
+			else
+			{
+				System.out.println("잘못 입력");
+				return;
+			}
+		}
+		else if(s_mode==3) // 감독 세부 검색을 선택한 경우
+		{
+        	System.out.println("\n* 감독 세부 정보 검색 *");
+			System.out.println("(1) 감독의 정보 검색 (2) 감독 필모그래피 검색 (3) 국적별 감독 정보");
+			System.out.print("검색할 방법을 번호로 선택해주세요 : ");
+
+			int n = scan.nextInt();
+			if(n==1) {
+				try
+				{
+					System.out.println("\n※안내※입력한 단어가 이름에 포함된 모든 감독의 정보를 출력합니다.\n");
+					// 입력한 문자열이 이름에 포함된 모든 감독의 정보 출력
+					sql = "select * from db2021_directors where name like ?";
+					pstmt = conn.prepareStatement(sql);
+					
+					String sname;
+					System.out.print("검색할 감독 이름: ");
+					scan.nextLine();//엔터 제거용 
+					sname = scan.nextLine();
+				
+					pstmt.setString(1,"%"+ sname+"%");
+					System.out.println("-'"+sname+"'와(과) 관련된 감독 정보 목록-");
+					
+					ResultSet rs = pstmt.executeQuery();
+					while(rs.next()){
+						String name = rs.getString("name");
+						String gender = rs.getString("gender");
+						String nationality = rs.getString("nationality");
+						Date birthday = rs. getDate("birthday");
+						int filmo = rs.getInt("filmography");
+						
+						System.out.println(name+" 감독의 정보");
+						System.out.println("성별:"+ gender +" 국적:"+nationality+" 생일:"+birthday+" 필모그래피:"+filmo);
+						System.out.println();
+					}
+					rs.close();
+					return;
+				}
+				catch(Exception e)
+				{
+					System.out.println(e+"예외 발생");
+				}
+			}
+			else if(n==2) {
+				try {
+					System.out.println("\n※안내※입력한 감독이 담당한 영화의 목록이 출력됩니다.\n");
+					sql = "select * from db2021_movies where director = ?";
+					pstmt = conn.prepareStatement(sql);
+					
+					String sname;
+					System.out.print("감독의 이름 입력: ");
+					scan.nextLine();//엔터 제거용 
+					sname = scan.nextLine();
+				
+					pstmt.setString(1, sname);
+					System.out.println("'"+sname+"'감독의 영화 목록");
+					
+					ResultSet rs = pstmt.executeQuery();
+					while(rs.next()){
+						String title = rs.getString("title");
+						String mnum = rs.getString("movieNumber");
+						Date rdate = rs.getDate("releaseDate");
+						String country = rs. getString("country");
+						int rtime = rs.getInt("runningTime");
+						float score = rs.getFloat("score");
+						int att = rs.getInt("attendance");
+						
+						System.out.println("["+mnum+"] 제목:"+title);
+						System.out.println("개봉일:"+rdate+" 국가:"+country
+								+ " 러닝타임:"+rtime+"(분) 평점:"+score+" 관객수:"+att+"명");
+						System.out.println();
+					}
+					rs.close();
+					return;
+				}
+				catch(Exception e) {
+					
+				}
+				
+			}
+			else if(n==3) {
+				try {
+					System.out.println("\n※안내※입력한 국가를 국적으로 하는 감독의 정보가 모두 출력됩니다.\n");
+					sql = "select * from db2021_directors use index(Didx) where nationality = ?";
+					pstmt = conn.prepareStatement(sql);
+					
+					System.out.print("국가 :"); 
+					scan.nextLine();//엔터 제거용 
+					String country = scan.nextLine();
+					
+					pstmt.setString(1, country);
+					
+					System.out.println("국적이 '"+country+"'인 감독 목록 ");
+					ResultSet rs = pstmt.executeQuery();
+					
+					while(rs.next()){
+						
+						String name = rs.getString("name");
+						if(!name.equals("-")) {//이름이 '-'인 튜플에서의 더미값이 한국이므로 한국을 검색할 때 '-'값이 함께 검색되지 않도록 if문 사용
+						String gender = rs.getString("gender");
+						Date birthday = rs. getDate("birthday");
+						int filmo = rs.getInt("filmography");
+						System.out.println(name+" 감독");
+						System.out.println("성별:"+ gender +" 생일:"+birthday+" 필모그래피:"+filmo);
+						System.out.println();
+						}
+					}
+					rs.close();
+					return;
+				}
+				catch(Exception e) {
+					
+				}
+			}
+			
+		}
+		else if(s_mode==4){
+			System.out.println("\n* 장르 세부 정보 검색 *");
+			System.out.println("(1) 장르 시리얼 번호 검색 (2) 장르별 영화 검색");
+			System.out.print("검색할 항목을 번호로 선택해주세요 : ");
+			int n = scan.nextInt();
+			if(n==1) {
+				try
+				{
+					// 입력한 장르의 시리얼 번호를 출력 
+					System.out.println("\n※안내※입력한 장르의 시리얼 번호가 출력됩니다. \n");
+
+					sql = "select * from db2021_genres use index(Gidx) where genre = ?";
+					pstmt = conn.prepareStatement(sql);
+					
+					String sgenre;
+					System.out.print("검색할 장르명 : ");
+					scan.nextLine();//엔터 제거용 
+					sgenre = scan.nextLine();
+				
+					pstmt.setString(1,sgenre);
+					System.out.print("'"+sgenre+"'의 시리얼 번호 : ");
+					
+					ResultSet rs = pstmt.executeQuery();
+					while(rs.next()){
+						String gnum = rs.getString("genreNumber");
+						System.out.println(gnum);
+						System.out.println();
+					}
+					rs.close();
+					return;
+				}
+				catch(Exception e)
+				{
+					System.out.println(e+"예외 발생");
+				}
+			}
+			else if(n==2) {
+				try {
+					System.out.println("\n※안내※ 입력한 장르를 포함하고 있는 영화의 목록이 출력됩니다.\n");
+
+					sql = "select genreNumber from db2021_genres use index(Gidx) where genre = ?";
+					pstmt = conn.prepareStatement(sql);
+					
+					String genreIn, genreNum = null;
+					System.out.print("장르명 입력 :");
+					scan.nextLine();//엔터 제거용 
+					genreIn = scan.nextLine();
+				
+					pstmt.setString(1, genreIn);
+					
+					ResultSet rs = pstmt.executeQuery();
+					while(rs.next())
+					{
+						genreNum = rs.getString("genreNumber");
+					}
+					System.out.println("-'"+genreIn+"'가(이) 포함된 영화 목록-");
+					String sql2 = "select * from db2021_movies as m where m.movieNumber in "
+							+ "( select movieNumber from db2021_genre_has as G where G.genreNumber = ? )";
+					PreparedStatement pstmt2 = conn.prepareStatement(sql2);
+					
+					pstmt2.setString(1,genreNum);
+
+					ResultSet rs2 = pstmt2.executeQuery();
+					int count =0;
+					while(rs2.next()){
+						count++;
+						String title = rs2.getString("title");
+						String mnum = rs2.getString("movieNumber");
+						
+						System.out.println("["+mnum+"] 제목 : "+title);
+					}
+					System.out.println("\n총 "+count+"개의 영화가 있습니다.");
+					rs.close();
+					return;
+				}
+				catch(Exception e) {
+					
+				}
+				
+			}
+		}
+		else {
+			System.out.println("잘못 입력");
+			return;
+		}
+	}
+}
+
+
+
+
+class User{//사용자 모드 
+	int mode;
+	Scanner scan=new Scanner(System.in);
+
+	void selectMode(Statement stmt, Connection conn) {
+		while(true) {
+			System.out.println("\n\t[User Mode]");
+			System.out.println("==========================");
+			System.out.println("(0) 돌아가기 (1) 검색");
+			System.out.print("실행할 항목을 번호로 선택해주세요 : ");
+			
+			mode=scan.nextInt();
+			
+			if(mode ==0) {
+				System.out.println("\n\n*** User mode 종료 ***\n");
+				break;
+			}
+			
+			else if(mode==1)
+			{System.out.println("\n\t<< User 사용자 검색 >>");
+			this.Usersearch(stmt);
+			}
+				
+		}
+	}
+
+	void Usersearch(Statement stmt) {
+		String search;
+		System.out.println("(0) 돌아가기 (1) 영화 검색 (2) 배우 검색 (3) 감독 검색 (4) 장르별 영화 검색 ");//사용자 모드 중 검색 
+		System.out.print("검색할 항목을 번호로 선택해주세요 : ");
+		mode=scan.nextInt();//입력 받기
+		scan.nextLine();
+		
+		if(mode==0)
+			return;
+		else if(mode==1) {//영화 제목 검색
+        	System.out.println("\n* 영화 검색 *"); 
+			System.out.print("검색할 영화의 제목을 입력해주세요 :");
+			search=scan.nextLine();//입력 받기
+			try {//mysql 연결 쿼리문 
+				ResultSet rs=stmt.executeQuery("select title,director,releaseDate,country,runningTime,score,attendance,name from DB2021_Movies,DB2021_ACTORS,DB2021_ACTOR_HAS where DB2021_Actors.actorNumber=DB2021_Actor_has.actorNumber and DB2021_Actor_has.movieNumber=DB2021_Movies.movieNumber and title LIKE '%" + search+"%'" );//일부만 검색해도 나오게끔 구현
+			
+				System.out.println("'"+search+"'와 관련된 영화 정보");
+				String previoustitle=null;
+			while(rs.next()) {//입력 받은 영화 제목,감독,개봉일,국가,러닝타임,평점,관객 수 출력
+				String title=rs.getString("title");
+				String director=rs.getString("director");
+				Date releaseDate=rs.getDate("releaseDate");
+				String country=rs.getString("country");
+				int runningTime=rs.getInt("runningTime");
+				float score=rs.getFloat("score");
+				int attendance=rs.getInt("attendance");
+				String name=rs.getString("name");
+				if(previoustitle==null) {
+					System.out.println("\n[제목:"+title+"]\n감독:"+director+"  개봉 날짜:"+releaseDate+"  국가:"+country+"  러닝타임:"+runningTime+"  평점:"+score+"  관객 수:"+ attendance);
+					System.out.print("출연배우: '"+name+"'");
+				}
+				else if(previoustitle.equals(title))
+				{System.out.print("'"+name+"' ");}
+
+				else {
+					System.out.println();
+					System.out.println("\n[제목:"+title+"]\n감독:"+director+"  개봉 날짜:"+releaseDate+"  국가:"+country+"  러닝타임:"+runningTime+"  평점:"+score+"  관객 수:"+ attendance);
+					System.out.print("출연배우: '"+name+"'");
+					}
+			
+				previoustitle=title;
+				}
+			
+		
+			rs.close();
+			System.out.println();
+
+			return;
+			}
+			catch(Exception e) {
+				System.out.println(e+"예외 발생");
+			}
+		}
+			
+			
+	
+	else if(mode==2) {//배우 검색
+    	System.out.println("\n* 배우 검색 *"); 
+		System.out.print("검색할 배우의 이름을 입력해주세요 : ");
+		search=scan.nextLine();//입력 받기
+		try {//mysql 연결 쿼리문 
+		ResultSet rs=stmt.executeQuery("select DB2021_ACTORS.name,DB2021_ACTORS.gender,DB2021_ACTORS.nationality,DB2021_ACTORS.birthday,DB2021_MOVIES.title from DB2021_MovieS,DB2021_ACTORS,DB2021_Actor_has where DB2021_Actors.actorNumber=DB2021_Actor_has.actorNumber and DB2021_Actor_has.movieNumber=DB2021_Movies.movieNumber and name LIKE'%"+search+"%'");//일부만 검색해도 나오게끔 구현
+		String previousactor=null;
+		while(rs.next()) {//입력 받은 배우 이름, 성별, 국적, 생일, 출연 작품 출력
+			String name=rs.getString("name");
+			String gender=rs.getString("gender");
+			String nationality=rs.getString("nationality");
+			Date birthday=rs.getDate("birthday");
+			String title=rs.getString("title");
+			if(previousactor==null) {
+			System.out.println("\n["+name+" 정보]");
+			System.out.println("배우 이름:"+name+"  성별:"+gender+"  국적:"+nationality+"  생일:"+birthday);
+			System.out.print("출연 작품 : '"+title+"'");
+		}
+			else if(previousactor.equals(name)) {
+				System.out.print(" '"+title+"' ");
+			}
+			else {
+				System.out.println();
+				System.out.println("\n["+name+" 정보]");
+				System.out.println("배우 이름:"+name+"  성별:"+gender+"  국적:"+nationality+"  생일:"+birthday);
+				System.out.print("출연 작품 : '"+title+"'");
+			}
+			previousactor=name;
+		}
+			rs.close();
+			System.out.println();
+			return;
+		}
+		
+		catch(Exception e) {
+			System.out.println(e+"예외 발생");
+		}
+		
+}
+		else if(mode==3) {//감독 검색
+	    	System.out.println("\n* 감독 검색 *"); 
+
+			System.out.print("검색할 감독의 이름을 입력해주세요 : ");
+			search=scan.nextLine();
+			try {//mysql 연결 쿼리문 
+			ResultSet rs=stmt.executeQuery("select * from DB2021_DIRECTORVIEW where name LIKE'%"+search+"%'");//일부만 검색해도 나오게끔 구현
+			while(rs.next()) {//입력 받은 감독 이름, 성별, 국적, 생일, 작품 수, 제작 작품 출력
+				String name=rs.getString("name");
+				String title=rs.getString("title");
+				String gender=rs.getString("gender");
+				String nationality=rs.getString("nationality");
+				Date birthday=rs.getDate("birthday");
+				int filmography=rs.getInt("filmography");
+				System.out.println("["+search+" 감독의 정보]");
+				System.out.println("성별:"+gender+"  국적:"+nationality+"  생일:"+birthday+"  작품 수:"+filmography);
+				System.out.println("제작 작품:"+title);
+				System.out.println();
+		}
+			rs.close();
+			return;
+	}
+	
+		catch(Exception e) {
+		System.out.println(e+"예외 발생");
+	}
+		
+			
+		}
+		else if(mode==4) {//장르 검색
+	    	System.out.println("\n* 장르별 영화 검색 *"); 
+
+			System.out.print("검색할 장르명을 입력해주세요 : ");
+			search=scan.nextLine();//입력 받기
+			System.out.println("\n["+search+"] 관련 영화");
+			try {//mysql 연결 쿼리문 
+			ResultSet rs=stmt.executeQuery("select * from DB2021_GENREVIEW where genre='"+search+"'");
+			int count=0;
+			while(rs.next()) {//입력 받은 장르에 해당하는 영화 출력
+				count++;
+				String genre=rs.getString("genre");
+				String title=rs.getString("title");
+				System.out.println(title);
+		}
+			System.out.println("\n"+search+"와 관련된 "+count+"개의 영화를 찾았습니다. ");
+			rs.close();
+			return;
+	}
+	
+		catch(Exception e) {
+		System.out.println(e+"예외 발생");
+	}
+		
+		
+	}
+	}
+}
+
+
+public class DDELT {
+
+	public static void main(String[] args) {
+		String serverURL = "jdbc:mysql://localhost:3306/db2021team09";
+		String userid = "root"; //db2021 바꿔야함
+		String passwd = "dnjsdn1508"; //db2021 바꿔야함
+		
+		Scanner scan = new Scanner(System.in);
+		
+		try(Connection conn = DriverManager.getConnection(
+				serverURL,userid,passwd);
+				Statement stmt = conn.createStatement();
+				)
+		{
+			while(true)  //처음 종료, admin, user 선택하는 부분
+			{
+				int mode;
+
+				System.out.println("=====[모드선택]=====");
+			
+				System.out.println("0. 종료");
+				System.out.println("1. Admin Mode");
+				System.out.println("2. User Mode");
+				System.out.println("==================");
+
+				System.out.print("\n모드를 번호로 선택해주세요 : ");
+				mode = scan.nextInt();
+				if(mode==0) // 처음 모드에서 0 입력 시 종료  
+					break;
+				else if(mode ==1) // 1 입력 시 admin 모드
+				{
+					System.out.println("\n\n*** Admin mode 시작 ***\n");
+
+					Admin admin = new Admin(); // admin class 생성하여 selectMode 메서드 호출 
+					admin.selectMode(stmt, conn);
+				}
+				else if(mode==2)
+				{
+					System.out.println("\n\n*** User mode 시작 ***\n");
+					User user = new User();
+					user.selectMode(stmt, conn);
+				}
+				else {  //0,1,2 외의 숫자가 들어온 경우 다시 입력받음
+					System.out.println("0 ~ 2사이의 수 입력");
+				}
+				System.out.println();
+			}
+			System.out.println("\n\n*** 시스템 종료 ***\n");
+		}
+		catch(SQLException sqle) {
+			System.out.println("SQLException : " + sqle);
+		}
+	}
+	
+}
